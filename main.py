@@ -6,12 +6,22 @@ import logging
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field # Adicionado Field para validação
 from typing import List, Optional
-
+from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="Orquestrador Seguro e Persistente - S2")
 
 DB_FILE = "sessions_db.json"
 logging.basicConfig(level=logging.INFO)
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://[IP_DO_SERVIDOR]" 
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # --- DB OPS ---
 def load_db():
     if os.path.exists(DB_FILE):
