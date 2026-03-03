@@ -74,7 +74,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 
 ## Documentação da API
 
-### POST /v1/chat
+### POST http://10.10.1.2:8000/v1/chat
 
 Endpoint principal para interação com a IA.
 
