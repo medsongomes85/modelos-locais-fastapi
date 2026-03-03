@@ -6,7 +6,7 @@ Infraestrutura para rodar e servir modelos de IA localmente utilizando FastAPI. 
  - Transformers e PyTorch para manipulação e execução de modelos de IA.
  - GPU para aceleração de modelos de aprendizado de máquina.
  - Docker (opcional) para containerização do ambiente de desenvolvimento.
-# Modelos Locais + Ollama (AI Gateway) — Benchmark e Observabilidade
+# Ollama (AI Gateway) — Benchmark e Observabilidade
 
 Este repositório contém um **gateway FastAPI** para acesso a modelos locais via **Ollama** e um processo padronizado para **benchmark** e **monitoramento de recursos** (GPU/VRAM + container).
 
