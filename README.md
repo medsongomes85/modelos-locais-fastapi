@@ -23,6 +23,7 @@ Este repositório contém um **gateway FastAPI** para acesso a modelos locais vi
 ---
 
 ## Estrutura do Projeto
+```
 ├── api/
 │ └── main.py
 ├── compose/
@@ -32,7 +33,7 @@ Este repositório contém um **gateway FastAPI** para acesso a modelos locais vi
 │ ├── runtime/
 │ └── traces/
 └── README.md
-
+```
 > Observação: a pasta `logs/` é **local** e está no `.gitignore` (não deve ser versionada).
 
 ---
