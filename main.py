@@ -1,103 +1,53 @@
-import json
-import os
-import re
-import httpx
-import logging
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field # Adicionado Field para validação
-from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
-app = FastAPI(title="Orquestrador Seguro e Persistente - S2")
+import httpx
+from pydantic import BaseModel
 
-DB_FILE = "sessions_db.json"
-logging.basicConfig(level=logging.INFO)
+app = FastAPI()
+
+# Libera o acesso para o Dev C (Front-end)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost",
-        "http://127.0.0.1",
-        "http://[IP_DO_SERVIDOR]" 
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-# --- DB OPS ---
-def load_db():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except: return {}
-    return {}
 
-def save_db(data):
-    with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
-
-sessions = load_db()
-
-# --- MODELO COM VALIDAÇÃO (Pydantic) ---
 class ChatRequest(BaseModel):
-    session_id: str = Field(..., min_length=1, max_length=50)
-    task: str = Field(..., min_length=2, max_length=2000) # Máximo 2000 chars
-    language: Optional[str] = "python"
+    session_id: str
+    task: str
 
-def clean_code(text: str) -> str:
-    text = re.sub(r'```(?:[a-zA-Z+]*)\n?', '', text)
-    text = text.replace('```', '')
-    return text.strip()
+@app.get("/health")
+async def health():
+    return {"status": "online", "mode": "direct-bridge"}
 
 @app.post("/v1/chat")
-async def chat_with_persistent_context(request: ChatRequest):
-    # 1. Validação de segurança extra (Manual)
-    if not request.task.strip():
-        raise HTTPException(status_code=400, detail="A tarefa não pode conter apenas espaços.")
+async def chat_endpoint(request: ChatRequest):
+    # 1. Monta o payload exatamente como o Dev A exige
+    payload = {
+        "prompt": request.task,
+        "model": "qwen2.5-coder:7b",
+        "stream": False
+    }
 
-    # 2. Gestão de Histórico
-    if request.session_id not in sessions:
-        sessions[request.session_id] = []
-    
-    history = sessions[request.session_id]
-    context_str = "\n".join([f"User: {h['u']}\nAI: {h['a']}" for h in history[-3:]])
-    
-    full_prompt = (
-        f"Histórico:\n{context_str}\n"
-        f"[INST] Tarefa: {request.task} em {request.language}. Responda apenas o código. [/INST]"
-    )
-    
-    url = "http://10.10.1.2:9010/generate"
-    
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient() as client:
+            # 2. Bate na rota real do Dev A
             response = await client.post(
-                url,
-                json={
-                    "model": "qwen2.5-coder:7b",
-                    "prompt": full_prompt,
-                    "stream": False,
-                    "options": {"temperature": 0.1, "num_ctx": 4096} # Limite de contexto no Ollama
-                }
+                "http://10.10.1.2:9010/generate",
+                json=payload,
+                timeout=60.0
             )
-            
-            if response.status_code != 200:
-                logging.error(f"Erro no Dev A: {response.status_code}")
-                raise HTTPException(status_code=502, detail="IA offline ou congestionada")
-
+            response.raise_for_status()
             data = response.json()
-            final_code = clean_code(data.get("response", ""))
-            
-            # 3. Persistência
-            sessions[request.session_id].append({"u": request.task, "a": final_code})
-            save_db(sessions)
-            
+
+            # 3. Retorna a resposta para o Dev C
+            # Nota: Verifique se o Dev A usa a chave 'response'. 
+            # Se não, o data.get retornará o JSON inteiro para debug.
             return {
                 "session_id": request.session_id,
-                "code": final_code,
-                "usage": {"prompt_chars": len(full_prompt)}
+                "code": data.get("response", data) 
             }
-            
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="O Dev A demorou muito para processar.")
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
